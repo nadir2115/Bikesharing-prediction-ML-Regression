@@ -1,8 +1,9 @@
 %Nadir Nibras Bike usage Regression problem
 clear; clc; close all;
-cd 'C:\Users\nadir\Documents\Machine Learning\Bike-Sharing-Datasetset'; 
+cd 'C:\Users\nadir\Documents\Machine Learning\Bikesharing-prediction-ML-Regression'; 
 Dataset = csvread('bikehour.csv', 1,0);
 [m n]=size(Dataset);                                        % find matrix size
+
 Dataset = Dataset(randperm(m),:);                           % shuffle randomly
 X= Dataset(:,1:(n-3));                                      % separate features
 yCasual= Dataset(:,n-2);                                       
