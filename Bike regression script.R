@@ -38,6 +38,16 @@ processedData$dteday<- NULL
 processedData<-processedData[,c(1,17,2:16)]
 
 # one hot encoding with loop
+# processedData[c(2:6,8:9)]=lapply(processedData[c(2:6,8:9)], factor) 
+# processedData <- dummy.data.frame(processedData, names=c("season"), sep="_") 
+# processedData <- dummy.data.frame(processedData, names=c("weekday"), sep="_")
+# processedData <- dummy.data.frame(processedData, names=c("weathersit"), sep="_")
+# processedData <- dummy.data.frame(processedData, names=c("mnth"), sep="_")
+# processedData <- dummy.data.frame(processedData, names=c("hr"), sep="_")
+# processedData <- dummy.data.frame(processedData, names=c("weekday"), sep="_")
+# processedData <- dummy.data.frame(processedData, names=c("weeknum"), sep="_")
+
+
 for(i in unique(processedData$season)) {
   processedData[[paste0("season_",i)]] <- ifelse(processedData$season==i,1,0)
 }
