@@ -20,6 +20,7 @@ library(dplyr)
 library(tidyr)
 library(caret)
 library(tictoc)
+library(lubridate)
 
 # set directory to R script folder
 current_path <- getActiveDocumentContext()$path 
@@ -63,12 +64,14 @@ for(i in unique(processedData$mnth)) {
 for(i in unique(processedData$hr)) {
   processedData[[paste0("hour_",i)]] <- ifelse(processedData$hr==i,1,0)
 }
-for(i in unique(processedData$weekday)) {
-  processedData[[paste0("weekday_",i)]] <- ifelse(processedData$weekday==i,1,0)
-}
+
 for(i in unique(processedData$weeknum)) {
   processedData[[paste0("weeknum_",i)]] <- ifelse(processedData$weeknum==i,1,0)
 }
+
+# Using last value as a predictor
+processedData$lastcount<- 0
+processedData$lastcount[2:17379]=processedData$cnt[1:17378]
 
 
 # Fix cyclic variables
@@ -82,7 +85,7 @@ processedData$mnth<-processedData$mnth/max(processedData$mnth)
 processedData$hr<- processedData$hr/max(processedData$hr)
 
 # move count to end
-processedData<- processedData[c(1:16, 18:121,17)]
+processedData<- processedData[c(1:16, 18:122,17)]
 # remove excessive columns
 processedData<- processedData[-c(1,3,8,10,15,16)]
 
@@ -183,8 +186,8 @@ set.seed(111)
 trainIndex <- createDataPartition(processedData$cnt, p = .9, list = FALSE, times = 1)
 bikeTrainingValidation <- processedData[ trainIndex,]
 bikeTest  <- processedData[-trainIndex,]
-xTest <- data.matrix(bikeTest[-c(115)])
-yTest <- data.matrix(bikeTest[c(115)])
+xTest <- data.matrix(bikeTest[-c(116)])
+yTest <- data.matrix(bikeTest[c(116)])
 
 
 # Maximum Likelihood Estimate ---------------------------------------------
@@ -192,8 +195,8 @@ yTest <- data.matrix(bikeTest[c(115)])
 p_error<- 100000;
 
 tic("MLE time")
-xTrain<- data.matrix(bikeTrainingValidation[-c(115)])
-yTrain<- data.matrix(bikeTrainingValidation[c(115)])
+xTrain<- data.matrix(bikeTrainingValidation[-c(116)])
+yTrain<- data.matrix(bikeTrainingValidation[c(116)])
 XtXtrain<- (t(xTrain))%*%xTrain;
 
 wMLE <- (ginv(XtXtrain))%*%(t(xTrain))%*%yTrain;
@@ -222,10 +225,10 @@ for (i in 1:100){
     trainIndex <- createDataPartition(bikeTrainingValidation$cnt, p = .8, list = FALSE, times = 1)
     bikeTrain <- bikeTrainingValidation[ trainIndex,]
     bikeVal  <- bikeTrainingValidation[-trainIndex,]
-    xTrain <- data.matrix(bikeTrain[-c(115)])
-    xVal <- data.matrix(bikeVal[-c(115)])
-    yTrain <- data.matrix(bikeTrain[c(115)])
-    yVal <- data.matrix(bikeVal[c(115)])
+    xTrain <- data.matrix(bikeTrain[-c(116)])
+    xVal <- data.matrix(bikeVal[-c(116)])
+    yTrain <- data.matrix(bikeTrain[c(116)])
+    yVal <- data.matrix(bikeVal[c(116)])
     
     XtXtrain<- (t(xTrain))%*%xTrain;
     
