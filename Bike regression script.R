@@ -8,7 +8,6 @@ cat("\014")
 graphics.off() 
 
 
-library(MASS)
 library(readr)
 library(datasets)
 library(ggplot2)
@@ -38,17 +37,6 @@ processedData$weeknum<-week(processedData$dteday)
 processedData$dteday<- NULL
 processedData<-processedData[,c(1,17,2:16)]
 
-# one hot encoding with loop
-# processedData[c(2:6,8:9)]=lapply(processedData[c(2:6,8:9)], factor) 
-# processedData <- dummy.data.frame(processedData, names=c("season"), sep="_") 
-# processedData <- dummy.data.frame(processedData, names=c("weekday"), sep="_")
-# processedData <- dummy.data.frame(processedData, names=c("weathersit"), sep="_")
-# processedData <- dummy.data.frame(processedData, names=c("mnth"), sep="_")
-# processedData <- dummy.data.frame(processedData, names=c("hr"), sep="_")
-# processedData <- dummy.data.frame(processedData, names=c("weekday"), sep="_")
-# processedData <- dummy.data.frame(processedData, names=c("weeknum"), sep="_")
-
-
 for(i in unique(processedData$season)) {
   processedData[[paste0("season_",i)]] <- ifelse(processedData$season==i,1,0)
 }
@@ -69,9 +57,17 @@ for(i in unique(processedData$weeknum)) {
   processedData[[paste0("weeknum_",i)]] <- ifelse(processedData$weeknum==i,1,0)
 }
 
-# Using last value as a predictor
-processedData$lastcount<- 0
-processedData$lastcount[2:17379]=processedData$cnt[1:17378]
+# Checkign ACF
+acf(x=processedData$cnt, lag.max=10 , plot=TRUE)
+
+#creating lag values
+processedData$lag1<-0
+processedData$lag2<-0
+processedData$lag3<-0
+
+processedData$lag1[2:17379]=processedData$cnt[1:17378]
+processedData$lag2[3:17379]=processedData$cnt[1:17377]
+processedData$lag3[4:17379]=processedData$cnt[1:17376]
 
 
 # Fix cyclic variables
@@ -79,15 +75,13 @@ processedData$weeknum<-pmin(abs(3-processedData$weeknum),56-processedData$weeknu
 processedData$mnth<-pmin(abs(1-processedData$mnth),13-processedData$mnth);  
 processedData$hr<-pmin(abs(4-processedData$hr),28-processedData$hr);  
 
-# Min-max normalization
-processedData$weeknum<-processedData$weeknum/max(processedData$weeknum)
-processedData$mnth<-processedData$mnth/max(processedData$mnth)
-processedData$hr<- processedData$hr/max(processedData$hr)
 
 # move count to end
-processedData<- processedData[c(1:16, 18:122,17)]
+processedData<- processedData[c(1:16, 18:124,17)]
 # remove excessive columns
 processedData<- processedData[-c(1,3,8,10,15,16)]
+
+processedData<- processedData[3:17379,]
 
 
 # Exploratory data analysis -----------------------------------------------
@@ -183,11 +177,11 @@ processedData$cnt <- log10(processedData$cnt+1)
 
 # Partitioning dataset into training/validation and test
 set.seed(111)
-trainIndex <- createDataPartition(processedData$cnt, p = .9, list = FALSE, times = 1)
+trainIndex <- c(1:15643)
 bikeTrainingValidation <- processedData[ trainIndex,]
 bikeTest  <- processedData[-trainIndex,]
-xTest <- data.matrix(bikeTest[-c(116)])
-yTest <- data.matrix(bikeTest[c(116)])
+xTest <- data.matrix(bikeTest[-c(118)])
+yTest <- data.matrix(bikeTest[c(118)])
 
 
 # Maximum Likelihood Estimate ---------------------------------------------
@@ -195,8 +189,8 @@ yTest <- data.matrix(bikeTest[c(116)])
 p_error<- 100000;
 
 tic("MLE time")
-xTrain<- data.matrix(bikeTrainingValidation[-c(116)])
-yTrain<- data.matrix(bikeTrainingValidation[c(116)])
+xTrain<- data.matrix(bikeTrainingValidation[-c(118)])
+yTrain<- data.matrix(bikeTrainingValidation[c(118)])
 XtXtrain<- (t(xTrain))%*%xTrain;
 
 wMLE <- (ginv(XtXtrain))%*%(t(xTrain))%*%yTrain;
@@ -225,10 +219,10 @@ for (i in 1:100){
     trainIndex <- createDataPartition(bikeTrainingValidation$cnt, p = .8, list = FALSE, times = 1)
     bikeTrain <- bikeTrainingValidation[ trainIndex,]
     bikeVal  <- bikeTrainingValidation[-trainIndex,]
-    xTrain <- data.matrix(bikeTrain[-c(116)])
-    xVal <- data.matrix(bikeVal[-c(116)])
-    yTrain <- data.matrix(bikeTrain[c(116)])
-    yVal <- data.matrix(bikeVal[c(116)])
+    xTrain <- data.matrix(bikeTrain[-c(118)])
+    xVal <- data.matrix(bikeVal[-c(118)])
+    yTrain <- data.matrix(bikeTrain[c(118)])
+    yVal <- data.matrix(bikeVal[c(118)])
     
     XtXtrain<- (t(xTrain))%*%xTrain;
     
@@ -249,33 +243,44 @@ yMAP_est= xTest%*%wMAP;
 
 toc()
 
-# evaluating results ------------------------------------------------------
+# evaluating model performance ------------------------------------------------------
 
 yTest<- 10^(yTest)-1
 yMLE_est<- 10^(yMLE_est)-1
 yMAP_est<- 10^(yMAP_est)-1
+y_naive= bikeTest$lag1
 
 MAP_MSE= mse(yMAP_est,yTest)
 MLE_MSE= mse(yMLE_est,yTest)
+naive_MSE= mse(y_naive,yTest)
 
 MAP_correlation= cor(yTest,yMAP_est)
 MLE_correlation= cor(yTest,yMLE_est)
+naive_correlation= cor(yTest,y_naive)
+
 
 R2MAP <- 1 - (sum((yTest-yMAP_est )^2)/sum((yTest-mean(yTest))^2))
 R2MLE <- 1 - (sum((yTest-yMLE_est )^2)/sum((yTest-mean(yTest))^2))
+R2naive <- 1 - (sum((yTest-y_naive )^2)/sum((yTest-mean(yTest))^2))
 
 
-testresults <- data.frame(yTest, yMLE_est, yMAP_est)
-names(testresults) <- c("yTest", "yMLE_est", "yMAP_est")
+
+testresults <- data.frame(yTest, yMLE_est, yMAP_est,y_naive)
+names(testresults) <- c("yTest", "yMLE_est", "yMAP_est", "y_naive")
 
 testresults$MLEerror <- abs(testresults$yMLE_est-testresults$yTest)
 testresults$MAPerror <- abs(testresults$yMAP_est-testresults$yTest)
+testresults$naiveerror <- abs(testresults$y_naive-testresults$yTest)
+
 
 meanMLEerror<- mean(testresults$MLEerror)
 medianMLEerror<- median(testresults$MLEerror)
+
 meanMAPerror<- mean(testresults$MAPerror)
 medianMAPerror<- median(testresults$MAPerror)
 
+meannaiveerror<- mean(testresults$naiveerror)
+mediannaiveerror<- median(testresults$naiveerror)
 
 ggplot(testresults,aes(yMLE_est,yTest))+
   geom_point(alpha=0.37, color='violet')+
@@ -285,17 +290,23 @@ ggplot(testresults,aes(yMAP_est,yTest))+
   geom_point(alpha=0.37, color='orange')+
   geom_smooth(method='lm')
 
+ggplot(testresults,aes(y_naive,yTest))+
+  geom_point(alpha=0.37, color='red')+
+  geom_smooth(method='lm')
+
 # Visualizing subset
-i=1:100
+i=200:300
 ytest_s=yTest[i]
 yMLE_s=yMLE_est[i]
 yMAP_s=yMAP_est[i]
+y_naive_s= y_naive[i]
 
-df <- data.frame(ytest_s, yMLE_s, yMAP_s, i)
+df <- data.frame(ytest_s, yMLE_s, yMAP_s,y_naive_s, i)
 
 df.plot <- df %>%
   gather(predictions, value, -c("i"))
 
 ggplot(df.plot, aes(x=i, y=value, color=predictions)) +
   geom_line( size=0.9)
+
 
